@@ -1,8 +1,6 @@
 # import necessary packages
 from Model.LAUNET_ConFormer import LAUNET, pad_to_multiple
-
 from utils.harmonic_residual_mask import hrps
-
 from utils.dataset import CustomDataset
 from utils.se_utils import power_compress, power_uncompress
 
@@ -27,8 +25,7 @@ import time
 import os
 
 
-
-
+# forward step function
 def forward_step(model, clean_batch, noisy_batch, device, config):
 
     num_layers = len(config.num_channels) - 2
@@ -72,8 +69,6 @@ def forward_step(model, clean_batch, noisy_batch, device, config):
 
     inputs = pad_to_multiple(inputs, mode=config.mode, multiple=2 ** num_layers)
     harmonic_mask = pad_to_multiple(harmonic_mask, mode=config.mode, multiple=2 ** num_layers)
-    
-    # harmonic_mask = harmonic_mask.float()
 
     # forward pass into the model
     est_spec = model(inputs, harmonic_mask) # [B?, 2, T, F]
@@ -98,45 +93,6 @@ def forward_step(model, clean_batch, noisy_batch, device, config):
     clean_harmonic = clean_harmonic_mask * clean_spec
     est_harmonic = clean_harmonic_mask * spec_uncompress
     
-    
-    """
-    ##########################################################################################
-    
-    beta = -5.9
-    
-    alpha = 6
-    
-    
-    # adding harmonic loss
-    # complex spectral error
-    spec_error = clean_orig_spec - spec_uncompress
-    
-    # calculate harmonic weight from clean magnitude
-    mag = torch.abs(clean_orig_spec).clamp_min(1e-8)
-    log_mag = torch.log(mag)
-    
-    beta = torch.tensor(beta, device=device, dtype=log_mag.dtype)
-    
-    W = torch.maximum(log_mag, beta) + alpha
-    
-    # normalize per-utterance (per sample) over (F,T)
-    W_min = W.amin(dim=(-2, -1), keepdim=True)
-    W_max = W.amax(dim=(-2, -1), keepdim=True)
-    W_norm = (W - W_min) / (W_max - W_min + 1e-8)
-
-    
-    # weigth complex error
-    h_spec_error = W_norm * spec_error
-    
-    # get error in time domain
-    error_harmonic = torch.istft(h_spec_error, config.n_fft, config.hop, window=window, center=True)
-    
-    
-    ##########################################################################################
-    """
-    
-    error_harmonic = None
-
 
     return {
         "est_real": est_real,
@@ -146,8 +102,7 @@ def forward_step(model, clean_batch, noisy_batch, device, config):
         "est_wav": est_wav,
         "clean_wav": clean_batch,
         "est_harmonic": est_harmonic,
-        "clean_harmonic": clean_harmonic,
-        "harmonic_error": error_harmonic
+        "clean_harmonic": clean_harmonic
     }
 
 
@@ -179,11 +134,6 @@ def calculate_loss(outputs, alpha_1=0.2, alpha_2=0.5, alpha_3=0.1, alpha_4=0.5):
     
     # calculate harmonic loss
     harmonic_loss = torch.mean(torch.abs(outputs['est_harmonic'] - outputs['clean_harmonic']))
-    
-    
-    # calculate harmonic loss in time domain
-    # harmonic_loss = torch.mean(outputs["harmonic_error"] * outputs["harmonic_error"])
-
 
     # calculate harmonic complex loss
     loss_ri = F.mse_loss(
@@ -200,8 +150,6 @@ def calculate_loss(outputs, alpha_1=0.2, alpha_2=0.5, alpha_3=0.1, alpha_4=0.5):
 
     # combine three losses
     loss = (alpha_1 * harmonic_loss) + (alpha_2 * loss_ri) +  (alpha_3 * si_snr_loss) + (alpha_4 * time_loss)
-    
-    # loss = (alpha_2 * loss_ri) +  (alpha_3 * si_snr_loss) + (alpha_4 * time_loss)
 
     # return total generator loss
     return loss
@@ -485,4 +433,3 @@ def main():
 # main function
 if __name__ == '__main__':
     main()
-

@@ -1,8 +1,6 @@
 # import necessary packages
 from Model.LAUNET_ConFormer import LAUNET, pad_to_multiple
-
 from utils.harmonic_residual_mask import hrps
-
 from utils.calculate_objectives_modified import tokenize_text, audio_to_text_thonburian_whisper, calculate_objectives, calculate_psnr
 from utils.compute_metrics import compute_metrics
 
@@ -98,8 +96,6 @@ def perform_denoising(noisy_audio, clean_audio, model, device, config, cut_len=1
 
     inputs = pad_to_multiple(inputs, mode=config.mode, multiple=2 ** num_layers)
     harmonic_mask = pad_to_multiple(harmonic_mask, mode=config.mode, multiple=2 ** num_layers)
-    
-    # harmonic_mask = harmonic_mask.float()
 
     # forward pass into the model
     with torch.no_grad():
@@ -243,8 +239,6 @@ def main():
         # get ground truth text
         name = noisy_file.split("/")[-1].split("-")[0]
         gt_text = gt_data[name]
-        
-        
     
         # read clean and noisy wav
         clean_audio, clean_sr = torchaudio.load(clean_file)
@@ -393,5 +387,3 @@ def main():
 # main function
 if __name__ == '__main__':
     main()
-    
-    

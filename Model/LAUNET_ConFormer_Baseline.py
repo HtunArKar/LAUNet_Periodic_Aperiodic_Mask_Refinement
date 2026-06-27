@@ -1,5 +1,5 @@
 # import necessary packages
-from .conformer import ConformerBlock
+from conformer import ConformerBlock
 import torch.nn.functional as F
 import torch.nn as nn
 import torch

@@ -1,5 +1,5 @@
 # import necessary packages
-from .conformer import ConformerBlock
+from conformer import ConformerBlock
 import torch.nn.functional as F
 import torch.nn as nn
 import torch
@@ -62,7 +62,7 @@ class HarmonicAttention(nn.Module):
             padding=0
         )
 
-        # effective initial alpha = 0.65 * tanh(0.077) ˜ 0.05
+        # effective initial alpha
         self.channel_alpha = nn.Parameter(torch.ones(out_channels) * 0.077)
 
         # mask-side projections
@@ -70,19 +70,17 @@ class HarmonicAttention(nn.Module):
         self.comp_proj = nn.Conv2d(1, out_channels, kernel_size=1, bias=True)
         self.frame_proj = nn.Conv2d(1, out_channels, kernel_size=1, bias=True)
 
-        # important: revert to v2 setting
-        # sigmoid(0) = 0.5, so complement path is available but not overly strong
+        # uv_lambda parameter controls the relative strength of the complement path in unvoiced frames
         self.uv_lambda = nn.Parameter(torch.zeros(out_channels))
 
-        # keep v2 smoothing strength
-        self.smooth_alpha = nn.Parameter(torch.tensor(-1.5))  # sigmoid(-1.5) ˜ 0.18
+        # smoothing strength
+        self.smooth_alpha = nn.Parameter(torch.tensor(-1.5))  # sigmoid(-1.5) ï¿½ 0.18
 
         # guarded frame-center parameter
-        # sigmoid(-0.2007) ˜ 0.45
         self.frame_center_logit = nn.Parameter(torch.tensor(-0.85))
         self.frame_scale = nn.Parameter(torch.tensor(0.0))
 
-        # boundary/detail path, but controlled
+        # boundary and detail
         self.boundary_proj = nn.Conv2d(1, out_channels, kernel_size=1, bias=True)
         self.boundary_alpha = nn.Parameter(torch.ones(out_channels) * -2.0)
 
@@ -156,7 +154,6 @@ class HarmonicAttention(nn.Module):
         boundary_sharpness = 1.0 + F.softplus(self.boundary_sharpness)
         boundary_conf = torch.tanh(boundary_sharpness * boundary_conf)
 
-        # important fix:
         # boundary path only active in frames with voiced/harmonic confidence
         boundary_conf = boundary_conf * frame_mix
 
@@ -256,6 +253,7 @@ class UpSampling(nn.Module):
                 out_channels: output channel dim
                 mode: dim_2, dim_3 and both, upsample along give dim
                 r: up-sampling factor
+
         """
 
         self.mode = mode
@@ -287,7 +285,7 @@ class UpSampling(nn.Module):
         Args:
                 x: input 4D tensor, shape = [B?, C, T, F]
         Return:
-                x: output 4D tensor with reduced associated dim
+                x: output 4D tensor with upscaled associated dim
         """
         x = self.pad(x)
         out = self.conv(x)
@@ -401,8 +399,16 @@ class LAUNET(nn.Module):
         """
         Args:
                 num_channels: channel dims details used in the network
-                attn_layers:
+                attn_layers: number of harmonic attention layers in each encoder and decoder block
+                conf_num_layers: number of conformer blocks in the middle of the network
                 mode: dim_2, dim_3 or both, to do downsampling and upsampling along provided dim mode
+                conv_kernel_size: kernel size of convolution in conformer block
+                heads: number of attention heads in conformer block
+                ff_mult: feedforward expansion factor in conformer block
+                expansion_factor: convolution expansion factor in conformer block
+                attn_dropout: attention dropout in conformer block
+                ff_dropout: feedforward dropout in conformer block
+                conv_dropout: convolution dropout in conformer block
         """
         self.num_layers = len(num_channels) - 2
         self.conf_num_layers = conf_num_layers
@@ -469,6 +475,9 @@ class LAUNET(nn.Module):
         Args:
                 x: input tensor of shape [B?, C, T, F],
                 h_mask: harmonic mask of shape [B?, C, T, F]
+
+        Return:
+                x: output tensor of shape [B?, C, T, F]
         """
         # initialize list to collect data
         feature_skips = []
@@ -527,3 +536,4 @@ class LAUNET(nn.Module):
                 x += feature_skips[i + 1]
 
         return x
+
