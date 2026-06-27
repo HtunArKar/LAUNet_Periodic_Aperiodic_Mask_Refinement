@@ -1,0 +1,4 @@
+torch == '2.7.0+cu126'
+torchaudio == '2.7.0+cu126'
+transformers == '4.57.0'
+numpy == '2.1.2'

@@ -14,7 +14,6 @@ from torch.nn import functional as F
 from torch import nn
 from socket import gethostname
 from collections import defaultdict
-import noisereduce as nr
 import torch.distributed as dist
 import numpy as np
 import torchaudio
